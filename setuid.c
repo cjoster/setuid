@@ -10,12 +10,6 @@
 #include <ctype.h>
 #include <errno.h>
 
-/* TODO TODO TODO
- * 
- * tokenize shell_cmd, shell_args
- *
- */
-
 #define PROGRAM "setuid"
 #define VERSION "v0.1a"
 #define COPYRIGHT "Copyright (©) 2018 CJ Oster (cjo@redhat.com). All " \
@@ -32,14 +26,14 @@
 extern char **environ;
 
 struct _cleanup_frame {
-        void (*func)(void *);
-        void *arg;
-        int run;
+	void (*func)(void *);
+	void *arg;
+	int run;
 };
 
 #define cleanup_push(routine, argument) do { struct _cleanup_frame \
 	_clframe __attribute__ ((__cleanup__ (_cleanup))) = \
-        { .func = (void *)(void *)(routine), .arg = (argument), .run = 1 }
+	{ .func = (void *)(void *)(routine), .arg = (argument), .run = 1 }
 
 #define cleanup_pop(execute) _clframe.run = execute; } while(0)
 
@@ -61,10 +55,9 @@ extern int execvpe(const char *file, char *const argv[],
 
 static void _cleanup( struct _cleanup_frame *frame )
 {
-        if( frame && frame->run && frame->func )
-                frame->func(frame->arg);
+	if( frame && frame->run && frame->func )
+		frame->func(frame->arg);
 }
-
 
 static char *copy_string( const char *in )
 {
@@ -115,45 +108,45 @@ static void copyright (const char *me )
 
 static void dealloc( void **in )
 {
-        if( in && *in ) {
-                free(*in);
-                *in = NULL;
-        }
+	if( in && *in ) {
+		free(*in);
+		*in = NULL;
+	}
 }
 
 static inline int longopt( const char *prog, int argc, char **argv, int opt, char *optarg, int *optind, int optional, int dashok, char **dest, const char *fmt, ... )
 {
-        char *thearg = NULL;
+	char *thearg = NULL;
 
-        if( optarg )
-                thearg = optarg;
-        else if( optind && *optind < argc && argv[*optind] && (argv[*optind][0] != '-' || dashok) ) {
-                thearg = argv[*optind];
-                (*optind)++;
-        }
+	if( optarg )
+		thearg = optarg;
+	else if( optind && *optind < argc && argv[*optind] && (argv[*optind][0] != '-' || dashok) ) {
+		thearg = argv[*optind];
+		(*optind)++;
+	}
 
-        if( !thearg ) {
-                if( !optional ) {
-                        if( !fmt )
-                                fprintf(stderr,"%s: option requires an argument -- '%c'\n", prog ? prog : PROGRAM, opt);
-                        else {
-                                va_list ap;
-                                va_start(ap, fmt);
-                                vfprintf(stderr, fmt, ap);
-                                va_end(ap);
-                        }
-                        return 1;
-                }
-                else {
-                        if( dest )
-                                *dest = NULL;
-                }
-        } else if( dest ) {
-                *dest = copy_string(thearg);
-                if( ! *dest )
-                        return -1;
-        }
-        return 0;
+	if( !thearg ) {
+		if( !optional ) {
+			if( !fmt )
+				fprintf(stderr,"%s: option requires an argument -- '%c'\n", prog ? prog : PROGRAM, opt);
+			else {
+				va_list ap;
+				va_start(ap, fmt);
+				vfprintf(stderr, fmt, ap);
+				va_end(ap);
+			}
+			return 1;
+		}
+		else {
+			if( dest )
+				*dest = NULL;
+		}
+	} else if( dest ) {
+		*dest = copy_string(thearg);
+		if( ! *dest )
+			return -1;
+	}
+	return 0;
 }
 
 static char *trim( char *in )

@@ -54,3 +54,6 @@ dkms.conf
 # Editor temporary files
 *.swo
 *.swp
+
+# Executable
+setuid
