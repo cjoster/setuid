@@ -1,11 +1,7 @@
 all: setuid
 
 setuid: setuid.c
-<<<<<<< HEAD
-	gcc -s -o setuid -Wall -O3 setuid.c
-=======
-	gcc -o setuid -Wall -O3 setuid.c
->>>>>>> bc975db... Initial commit
+	gcc -D_GNU_SOURCE -s -o setuid -Wall -O3 setuid.c
 
 clean:
 	rm -f setuid

@@ -50,8 +50,8 @@ static char *trim(char *);
 static void freeargs( char *** );
 static size_t arglen( char ** );
 static int append( char ***args, const char *str );
-extern int execvpe(const char *file, char *const argv[],
-	char *const envp[]);
+//extern int execvpe(const char *file, char *const argv[],
+//	char *const envp[]);
 
 static void _cleanup( struct _cleanup_frame *frame )
 {
