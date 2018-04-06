@@ -308,7 +308,7 @@ int main( int argc, char **argv, char **envp )
 				break;
 
 			case 'g':
-				if( gid != -1 ) {
+				if( gid == -1 ) {
 					tmpstr = NULL;
 					cleanup_push(dealloc, &tmpstr);
 					gr = NULL;
@@ -485,10 +485,7 @@ int main( int argc, char **argv, char **envp )
 			return 1;
 	}
 
-	if( copy_environ )
-		execvpe(shell, args, envp);
-	else
-		execvpe(shell, args, NULL);
+	execvpe(shell, args, environ);
 	
 	fprintf(stderr, "%s: Could not execute \"%s\": %s\n", prog, shell, strerror(errno));
 	fflush(stderr);
