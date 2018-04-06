@@ -402,7 +402,7 @@ int main( int argc, char **argv, char **envp )
 
 	pwd = NULL;
 	if( sscanf(target_user, "%u", &uid) < 1 || called_shell ) {
-		if( sscanf(target_user,"%u", &uid) >= 1 )
+		if( uid != -1 )
 			pwd = getpwuid(uid);
 		else 
 			pwd = getpwnam(target_user);
