@@ -29,14 +29,20 @@ struct _cleanup_frame {
 	void (*func)(void *);
 	void *arg;
 	int run;
+	struct _cleanup_frame *next;
 };
+
+static struct _cleanup_frame *_cl_stack = (void *)-1;
 
 #define cleanup_push(routine, argument) do { struct _cleanup_frame \
 	_clframe __attribute__ ((__cleanup__ (_cleanup))) = \
-	{ .func = (void *)(void *)(routine), .arg = (argument), .run = 1 }
+	{ .func = (void *)(void *)(routine), .arg = (argument), .run = 1 }; \
+	_register_cleanup( &_clframe );
 
 #define cleanup_pop(execute) _clframe.run = execute; } while(0)
 
+static void _cleanup_exit( void );
+static void _register_cleanup( struct _cleanup_frame * );
 static void _cleanup( struct _cleanup_frame * );
 static char *copy_string( const char * );
 static void usage( const char * );
@@ -50,13 +56,33 @@ static char *trim(char *);
 static void freeargs( char *** );
 static size_t arglen( char ** );
 static int append( char ***args, const char *str );
-//extern int execvpe(const char *file, char *const argv[],
-//	char *const envp[]);
 
 static void _cleanup( struct _cleanup_frame *frame )
 {
 	if( frame && frame->run && frame->func )
 		frame->func(frame->arg);
+	_cl_stack = frame->next;
+}
+
+static void _cleanup_exit( void )
+{
+	if( _cl_stack != (void *)-1 )
+		while( _cl_stack )
+			_cleanup( _cl_stack );
+}
+
+static void _register_cleanup( struct _cleanup_frame *frame )
+{
+	if ( !frame )
+		return;
+
+	if( _cl_stack == (void *)-1 ) {
+		_cl_stack = NULL;
+		atexit(_cleanup_exit);
+	}
+
+	frame->next = _cl_stack;
+	_cl_stack = frame;
 }
 
 static char *copy_string( const char *in )
@@ -68,7 +94,7 @@ static char *copy_string( const char *in )
 
 	if( (out = malloc(strlen(in)+1)) == NULL ) {
 		fprintf(stderr,"Could not allocate memory.\n");
-		exit(1);
+		exit(-1);
 	}
 	strcpy(out, in);
 
@@ -141,11 +167,9 @@ static inline int longopt( const char *prog, int argc, char **argv, int opt, cha
 			if( dest )
 				*dest = NULL;
 		}
-	} else if( dest ) {
+	} else if( dest )
 		*dest = copy_string(thearg);
-		if( ! *dest )
-			return -1;
-	}
+
 	return 0;
 }
 
@@ -204,7 +228,7 @@ static int append( char ***args, const char *str )
 	if( !*args ) {
 		if( (*args = malloc(sizeof(char *) * 2)) == NULL ) {
 			fprintf(stderr, "Could not allocate memory.\n");
-			return -1;
+			exit(-1);
 		}
 		(*args)[1] = NULL;
 		len = 1;
@@ -220,8 +244,7 @@ static int append( char ***args, const char *str )
 	}
 	(*args)[len] = NULL;
 
-	if( ((*args)[len - 1] = copy_string(str)) == NULL )
-		return -1;
+	((*args)[len - 1] = copy_string(str));
 	
 	return 0;
 }
@@ -248,6 +271,7 @@ int main( int argc, char **argv, char **envp )
 	shell_args = NULL;
 	shell_cmd = NULL;
 	target_user = NULL;
+	args = NULL;
 	cleanup_push(dealloc, &shell_cmd);
 	cleanup_push(dealloc, &shell_args);
 	cleanup_push(dealloc, &shell);
@@ -258,10 +282,8 @@ int main( int argc, char **argv, char **envp )
 	if( argv[0] && strlen(argv[0]) > 0 ) {
 		tmpstr = NULL;
 		cleanup_push(dealloc,&tmpstr);
-		tmpstr = copy_string(argv[0]);
-		if( tmpstr ) {
+		if( (tmpstr = copy_string(argv[0])) )
 			prog = copy_string(basename(tmpstr));
-		}
 		cleanup_pop(1);
 	}
 
@@ -376,10 +398,9 @@ int main( int argc, char **argv, char **envp )
 		}
 
 		if( !target_user ) {
-			if( argv[optind] ) {
-				if( (target_user = copy_string(argv[optind])) == NULL )
-					return 1;
-			} else {
+			if( argv[optind] )
+				target_user = copy_string(argv[optind]);
+			else {
 				fprintf(stderr,"No user specified.\n");
 				argerr = 1;
 			}
@@ -433,29 +454,31 @@ int main( int argc, char **argv, char **envp )
 		return 1;
 	}
 
-	if( !shell_args && !(shell_args = copy_string(DEFAULT_SHELL_ARGS)) )
-		return 1;
+	if( !shell_args ) 
+		shell_args = copy_string(DEFAULT_SHELL_ARGS);
 
 	if( !shell ) {
-		if( (pwd = getpwuid(getuid())) && pwd->pw_shell && strlen(pwd->pw_shell) > 0 ) {
-			if( !(shell = copy_string(pwd->pw_shell)) )
-				return 1;
-		} else {
-			if( !(shell = copy_string(DEFAULT_SHELL)) )
-				return 1;
-		}
+		if( (pwd = getpwuid(getuid())) && pwd->pw_shell && strlen(pwd->pw_shell) > 0 )
+			shell = copy_string(pwd->pw_shell);
+		else
+			shell = copy_string(DEFAULT_SHELL);
 	}
 
-	if( shell_cmd )
-		printf("Shell command: \"%s\"\n", shell_cmd);
-	
 	if( geteuid() != 0 )
 		fprintf(stderr, "Not running as root. Probably will not work. Trying anyway.\n");
 
-	if( setgid(gid) )
+	if( setgid(gid) ) {
 		perror("setgid");
-	if( setgroups(1,&gid) )
+		fprintf(stderr, "Could not set gid to %u. Exiting.\n", gid);
+		return 1;
+	}
+
+	if( setgroups(1,&gid) ) {
 		perror("setgroups");
+		fprintf(stderr, "Could not set groups. Exiting.\n");
+		return 1;
+	}
+
 	if( setuid(uid) ) {
 		perror("setuid");
 		fprintf(stderr, "Could not set uid to %u. Exiting.\n", uid);
@@ -467,17 +490,13 @@ int main( int argc, char **argv, char **envp )
 	else
 		environ = NULL;
 
-	args = NULL;
-	if( append(&args, basename(shell)) < 0 )
-		return 1;
+	append(&args, basename(shell));
 	
 	if( (a = strtok(shell_args, SHELL_DELIM)) ) {
-		if( append(&args, a) < 0 )
-			return 1;
-		while( (a = strtok(NULL, SHELL_DELIM)) ) {
-			if( append(&args, a) < 0 )
-				return 1;
-		}
+		append(&args, a);
+
+		while( (a = strtok(NULL, SHELL_DELIM)) )
+			append(&args, a);
 	}
 
 	if( shell_cmd ) {
@@ -489,6 +508,7 @@ int main( int argc, char **argv, char **envp )
 	
 	fprintf(stderr, "%s: Could not execute \"%s\": %s\n", prog, shell, strerror(errno));
 	fflush(stderr);
+
 	cleanup_pop(1);
 	cleanup_pop(1);
 	cleanup_pop(1);
