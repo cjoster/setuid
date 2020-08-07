@@ -12,7 +12,7 @@
 
 #define PROGRAM "setuid"
 #define VERSION "v0.1a"
-#define COPYRIGHT "Copyright (©) 2018 CJ Oster (cjo@redhat.com). All " \
+#define COPYRIGHT "Copyright (©) 2018-2020 CJ Oster (ocj@vmware.com). All " \
 	"rights reserved."
 #define LICENSE "This program is licensed under the GNU General Pulic\n" \
 	"License, version 3 (GPLv3). More information can be found at\n" \
@@ -504,7 +504,7 @@ int main( int argc, char **argv, char **envp )
 			return 1;
 	}
 
-	execvpe(shell, args, environ);
+	execve(shell, args, environ);
 	
 	fprintf(stderr, "%s: Could not execute \"%s\": %s\n", prog, shell, strerror(errno));
 	fflush(stderr);
